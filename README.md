@@ -107,6 +107,46 @@ con tildes y `ñ` correctas sin configurar nada.
 
 ---
 
+## Limpieza a formato largo: `clean_mensuales.R`
+
+`scrape_spensiones.R` baja las tablas **fieles a su forma original** (cruzadas, con
+encabezados de dos niveles). Para análisis conviene formato *largo* (tidy).
+`clean_mensuales.R` lo hace para los tres cuadros **mensuales** (reutiliza la misma
+`./cache/`) y deja los resultados en `./tidy/`:
+
+| Archivo | Estructura | Columnas |
+|---------|-----------|----------|
+| `mensual_04A_tipo_sexo.csv`        | tipo × sexo            | `periodo, tipo, sexo, n_cotizantes, ingreso_imponible_promedio` |
+| `mensual_04C_afp_tipo_sexo.csv`    | AFP × tipo × sexo      | `periodo, afp, tipo, sexo, ingreso_imponible_promedio` |
+| `mensual_04E_fondo_afp_tipo_sexo.csv` | fondo × AFP × tipo × sexo | `periodo, fondo, afp, tipo, sexo, ingreso_imponible_promedio` |
+
+Detalles no obvios que maneja el parser (verificados contra los datos reales):
+
+- **04A** incluye una fila `TOTAL` (total general) además de los 3 tipos; el total de
+  cada tipo queda como `sexo = "Total"`.
+- **04E** no es solo "Fondo Tipo A": trae los **5 multifondos (A–E)** concatenados. Los
+  títulos `FONDO TIPO X` van *fuera* de las `<tr>`, así que el fondo se asigna por orden
+  de bloque (8 AFP por fondo). Quedan 5 × 8 × 16 = 640 filas por período.
+
+Para añadir limpieza de los cuadros **trimestrales**, ver [`CLAUDE.md`](CLAUDE.md).
+
+---
+
+## Correr sin instalar R (Docker)
+
+¿No quieres instalar R? Usa el contenedor. La imagen `rocker/r-ver` trae R con paquetes
+**binarios** (instala en segundos, sin compilar):
+
+```bash
+docker build -t spensiones .
+docker run --rm -v "$PWD:/work" spensiones Rscript scrape_spensiones.R   # CSV crudos
+docker run --rm -v "$PWD:/work" spensiones Rscript clean_mensuales.R     # tidy mensuales
+```
+
+El volumen `-v "$PWD:/work"` deja `cache/`, `csv/` y `tidy/` en tu disco.
+
+---
+
 ## Recomendaciones
 
 1. **Uso responsable / rate limiting.** El script ya incluye `Sys.sleep(0.25)` entre

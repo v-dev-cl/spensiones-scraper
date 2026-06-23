@@ -1,0 +1,7 @@
+cache/
+csv/
+tidy/
+.git/
+*.Rproj
+.Rhistory
+.RData

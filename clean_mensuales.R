@@ -26,8 +26,9 @@ PAGINA <- "https://www.spensiones.cl/apps/centroEstadisticas/paginaCuadrosCCEE.p
 BASE   <- "https://www.spensiones.cl/apps/loadEstadisticas/siSP.php"
 UA     <- "Mozilla/5.0 (investigacion academica; R/rvest)"
 
-DESDE <- "2018/01"   # AAAA/MM minimo  (NULL = toda la historia)
-HASTA <- "2026/12"   # AAAA/MM maximo
+# Editable aqui o via entorno SP_DESDE / SP_HASTA (AAAA/MM; vacio = sin limite)
+DESDE <- { v <- Sys.getenv("SP_DESDE", "2018/01"); if (v == "") NULL else v }
+HASTA <- { v <- Sys.getenv("SP_HASTA", "2026/12"); if (v == "") NULL else v }
 
 ## ---- Helpers ----------------------------------------------------------------
 
@@ -131,7 +132,9 @@ descargar_html <- function(value) {
   r <- RETRY("GET", BASE,
              query = list(id = paste0(value, ".xls"), menu = "sci",
                           menuN1 = "cotycot", menuN2 = "ingimp", orden = 10, ext = ".xls"),
-             add_headers(`User-Agent` = UA), times = 4, pause_base = 1, timeout(30), quiet = TRUE)
+             # OJO: el endpoint exige Referer; sin el devuelve 404.
+             add_headers(`User-Agent` = UA, Referer = PAGINA),
+             times = 4, pause_base = 1, timeout(30), quiet = TRUE)
   if (http_error(r)) return(NA_character_)
   txt <- content(r, as = "text", encoding = "ISO-8859-1")
   write_file(txt, cf); Sys.sleep(0.25); txt

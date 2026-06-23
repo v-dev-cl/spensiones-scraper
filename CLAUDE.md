@@ -27,7 +27,13 @@ Centro de Estadísticas de `spensiones.cl`. Dos scripts:
 
 ## Gotchas verificados contra datos reales
 
-1. **Encoding.** El servidor entrega `ISO-8859-1`. Siempre
+0. **El endpoint EXIGE `Referer`.** `siSP.php` sin cabecera `Referer` responde **404**
+   (página "no encontrada"), aunque la URL sea correcta. Hay que mandar
+   `Referer = <URL de la página del menú>`. (Leer el `<select>` de períodos NO requiere
+   Referer; solo la descarga de cuadros.) Sin esto todo baja vacío / 0 filas.
+1. **Multi-tabla.** Algunos cuadros son **varias `<table>`** (04E = 5, una por multifondo).
+   Usar `html_elements("table")` (plural) y combinar; `html_element` singular pierde datos.
+2. **Encoding.** El servidor entrega `ISO-8859-1`. Siempre
    `content(r, as="text", encoding="ISO-8859-1")`. Si no, salen `Ã±`/`Ã³`.
    Escribir con `write_excel_csv` (UTF-8 + BOM) para que Excel lo abra bien.
 2. **Encabezados = `<th>`, datos = `<td>`.** Parsear solo `<td>` excluye los encabezados
@@ -35,6 +41,10 @@ Centro de Estadísticas de `spensiones.cl`. Dos scripts:
    (1 etiqueta + 16 valores).
 3. **Números:** separador de miles `.` y a veces sin separador. Limpiar con
    `str_replace_all(x, "[^0-9-]", "")` y `as.numeric`. `""`/`-` → `NA`.
+   En el dump crudo (`scrape_spensiones.R`) las celdas se leen con
+   `html_table(header = FALSE, convert = FALSE)` para evitar el error
+   *"duplicate names"* (las tablas cruzadas repiten Total/Masculino/Femenino/S/I) y
+   conservar todo como texto.
 4. **Orden de las 16 columnas** en tablas cruzadas: tipo *afuera*, sexo *adentro* →
    `DEPENDIENTES[Total,Masc,Fem,S/I], INDEPENDIENTES[...], AFILIADOS VOLUNTARIOS[...], TOTAL[...]`.
    En R: `expand_grid(tipo = TIPOS, sexo = SEXOS)`.
@@ -67,9 +77,15 @@ Centro de Estadísticas de `spensiones.cl`. Dos scripts:
 
 ```bash
 docker build -t spensiones .
+# rango por entorno (ventana corta para iterar rápido); --user evita CSV root-owned
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -e SP_DESDE=2026/03 -e SP_HASTA=2026/03 -v "$PWD:/work" spensiones Rscript scrape_spensiones.R
 # test offline de parsers: pre-cargar cache/ con HTML reales y correr con --network none
 docker run --rm --network none -v "$PWD:/work" spensiones Rscript clean_mensuales.R
 ```
+
+Pipeline verificado en contenedor contra datos reales (2026/03): scraper → 19 CSVs
+(04E con sus 5 fondos = 55 filas), limpiador → 04A=16, 04C=128, 04E=640 filas/período.
 
 Para validar un parser nuevo, usar chequeos de consistencia (p.ej. en 04A la fila `Total`
 de cada tipo debe igualar la suma `Masculino+Femenino+S/I`).

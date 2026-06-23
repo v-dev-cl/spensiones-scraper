@@ -1,6 +1,8 @@
 # Datos descargados / caché (no versionar)
 cache/
 csv/
+tidy/
+*.log
 
 # R
 .Rhistory

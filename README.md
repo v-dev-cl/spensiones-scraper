@@ -87,11 +87,17 @@ R ≥ 4.1 (se usa el pipe nativo `|>`).
 Rscript scrape_spensiones.R
 ```
 
-Ajusta el rango de fechas editando las variables al inicio del script:
+Ajusta el rango de fechas editando las variables al inicio del script, o por
+**variables de entorno** (útil en Docker/CI) `SP_DESDE` / `SP_HASTA` (formato `AAAA/MM`;
+cadena vacía = sin límite, es decir toda la historia):
 
 ```r
 DESDE <- "2018/01"   # AAAA/MM mínimo  (NULL = toda la historia)
 HASTA <- "2026/12"   # AAAA/MM máximo
+```
+
+```bash
+SP_DESDE=2026/01 SP_HASTA=2026/04 Rscript scrape_spensiones.R   # solo ene–abr 2026
 ```
 
 ### Salida
@@ -139,11 +145,21 @@ Para añadir limpieza de los cuadros **trimestrales**, ver [`CLAUDE.md`](CLAUDE.
 
 ```bash
 docker build -t spensiones .
-docker run --rm -v "$PWD:/work" spensiones Rscript scrape_spensiones.R   # CSV crudos
-docker run --rm -v "$PWD:/work" spensiones Rscript clean_mensuales.R     # tidy mensuales
+
+# se recomienda --user para que los CSV queden a tu nombre (no root), y -e HOME=/tmp:
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -e SP_DESDE=2026/01 -e SP_HASTA=2026/04 \
+  -v "$PWD:/work" spensiones Rscript scrape_spensiones.R   # CSV crudos
+
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -e SP_DESDE=2026/01 -e SP_HASTA=2026/04 \
+  -v "$PWD:/work" spensiones Rscript clean_mensuales.R     # tidy mensuales
 ```
 
 El volumen `-v "$PWD:/work"` deja `cache/`, `csv/` y `tidy/` en tu disco.
+
+> Pipeline verificado en contenedor contra datos reales (mar 2026): 19 CSVs crudos
+> (04E con sus 5 fondos) y los 3 tidy mensuales (04A/04C/04E).
 
 ---
 

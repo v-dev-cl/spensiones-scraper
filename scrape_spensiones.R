@@ -20,9 +20,10 @@ PAGINA <- "https://www.spensiones.cl/apps/centroEstadisticas/paginaCuadrosCCEE.p
 BASE   <- "https://www.spensiones.cl/apps/loadEstadisticas/siSP.php"
 UA     <- "Mozilla/5.0 (investigacion academica; R/rvest)"
 
-## ---- Filtro de rango (cambia esto). Pon DESDE/HASTA = NULL para TODO --------
-DESDE <- "2018/01"   # AAAA/MM minimo a descargar  (NULL = sin limite inferior)
-HASTA <- "2026/12"   # AAAA/MM maximo a descargar  (NULL = sin limite superior)
+## ---- Filtro de rango. Editable aqui o via variables de entorno --------------
+## SP_DESDE / SP_HASTA (formato AAAA/MM). Cadena vacia => sin limite (toda la historia).
+DESDE <- { v <- Sys.getenv("SP_DESDE", "2018/01"); if (v == "") NULL else v }
+HASTA <- { v <- Sys.getenv("SP_HASTA", "2026/12"); if (v == "") NULL else v }
 
 ## ---- Catalogo de los 19 cuadros, en el orden de la pagina -------------------
 cuadros <- tribble(
@@ -77,7 +78,8 @@ descargar_tabla <- function(value) {
                query = list(id = paste0(value, ".xls"),
                             menu = "sci", menuN1 = "cotycot", menuN2 = "ingimp",
                             orden = 10, ext = ".xls"),
-               add_headers(`User-Agent` = UA),
+               # OJO: el endpoint exige Referer; sin el devuelve 404.
+               add_headers(`User-Agent` = UA, Referer = PAGINA),
                times = 4, pause_base = 1, timeout(30), quiet = TRUE)
     if (http_error(r)) return(NULL)
     # el servidor declara Latin-1; forzarlo evita los  ile / Ã±
@@ -85,12 +87,19 @@ descargar_tabla <- function(value) {
     write_file(txt, cache_file)
     Sys.sleep(0.25)  # cortesia con el servidor
   }
-  tab <- tryCatch(
-    read_html(txt) |> html_element("table") |> html_table(fill = TRUE),
-    error = function(e) NULL
+  # OJO: algunos cuadros (p.ej. 04E) son VARIAS <table> (una por multifondo);
+  # y las tablas cruzadas tienen encabezados repetidos. Por eso:
+  #  - tomamos TODAS las <table> (no html_element singular)
+  #  - header=FALSE + convert=FALSE -> celdas como texto, sin nombres duplicados
+  tablas <- tryCatch(
+    read_html(txt) |> html_elements("table") |> html_table(header = FALSE, convert = FALSE),
+    error = function(e) list()
   )
-  if (is.null(tab) || nrow(tab) == 0) return(NULL)
-  tab |> mutate(across(everything(), as.character))  # uniforma tipos para apilar
+  tablas <- tablas |>
+    keep(~ nrow(.x) > 0 && ncol(.x) > 0) |>
+    map(~ setNames(.x, paste0("c", seq_len(ncol(.x)))))  # nombres posicionales uniformes
+  if (length(tablas) == 0) return(NULL)
+  bind_rows(tablas)   # apila las sub-tablas (incluye sus filas de encabezado)
 }
 
 ## ---- Bucle principal: un CSV por cuadro -------------------------------------

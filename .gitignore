@@ -1,0 +1,11 @@
+# Datos descargados / caché (no versionar)
+cache/
+csv/
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+.Renviron
+renv/library/
